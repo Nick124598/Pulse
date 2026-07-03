@@ -2,6 +2,7 @@ package org.nick124;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.FileDialog;
@@ -16,6 +17,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
 
 import javax.swing.BorderFactory;
 import javax.swing.JDialog;
@@ -26,15 +29,24 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
+import javax.swing.JTree;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.filechooser.FileSystemView;
 import javax.swing.text.Element;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.DefaultTreeModel;
 
-import org.nick124.FileChooser.JnaFileChooser;
+import org.nick124.FileChooser.Win11FileDialog;
 
 import com.sun.jna.Platform;
+
+import jnafilechooser.api.JnaFileChooser;
+import jnafilechooser.api.JnaFileChooser.Mode;
 
 public class GUI {
     private JFrame frame;
@@ -42,7 +54,10 @@ public class GUI {
     private JScrollPane scrollPane;
     private LineNumberGutter lineNumberGutter;
     private JMenu optionsMenu;
-
+    private JSplitPane splitPane;
+    private JTree explorerTree;
+    private JScrollPane explorerScroll;
+    
     // Theme Colors
     private final Color LIGHT_BG = Color.WHITE;
     private final Color LIGHT_FG = Color.BLACK;
@@ -86,22 +101,14 @@ public class GUI {
     }
     
     private java.io.File currentFile = null;
+    private Path projectPath = null;
     
     public void setFile(java.io.File f) {currentFile = f;}
     
     private void saveFile(boolean isSaveAs) {
         if (isSaveAs || currentFile == null) {
-            java.awt.FileDialog fileDialog = new java.awt.FileDialog(frame, "Save File As", java.awt.FileDialog.SAVE);
-            fileDialog.setVisible(true);
-            
-            String directory = fileDialog.getDirectory();
-            String file = fileDialog.getFile();
-            
-            if (directory != null && file != null) {
-                currentFile = new java.io.File(directory, file);
-            } else {
-                return;
-            }
+        		JnaFileChooser fc = new JnaFileChooser();
+        		currentFile = fc.getSelectedFile();
         }
         try (java.io.FileWriter writer = new java.io.FileWriter(currentFile)) {
             textArea.write(writer);
@@ -112,32 +119,85 @@ public class GUI {
                 javax.swing.JOptionPane.ERROR_MESSAGE);
         }
     }
-    private void openFile() {
-//    		JnaFileChooser fc = new JnaFileChooser();
-//    		fc.setMode(JnaFileChooser.Mode.Directories);
-    	java.awt.FileDialog fileDialog = new java.awt.FileDialog(frame, "Open File", java.awt.FileDialog.LOAD);
-        fileDialog.setVisible(true);
-        String directory = fileDialog.getDirectory();
-        String file = fileDialog.getFile();
-        
-        if (directory != null && file != null) {
-            textArea.setText("");
-            currentFile = new java.io.File(directory, file);
-            
-            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(currentFile))) {
-                String line;
-                boolean firstLine = true;
-                while ((line = br.readLine()) != null) {
-                    if (!firstLine) {
-                        textArea.append("\n");
-                    }
-                    textArea.append(line);
-                    firstLine = false;
-                }
-            } catch (java.io.IOException e) {
-                javax.swing.JOptionPane.showMessageDialog(frame, "Error opening file: " + e.getMessage());
+    private DefaultMutableTreeNode createNode(File file) {
+
+        DefaultMutableTreeNode node =
+                new DefaultMutableTreeNode(file);
+
+        File[] files = file.listFiles();
+
+        if (files != null) {
+
+            Arrays.sort(files, (a, b) -> {
+
+                if (a.isDirectory() && !b.isDirectory())
+                    return -1;
+
+                if (!a.isDirectory() && b.isDirectory())
+                    return 1;
+
+                return a.getName().compareToIgnoreCase(b.getName());
+            });
+
+            for (File child : files) {
+                node.add(createNode(child));
             }
         }
+
+        return node;
+    }
+    
+    private void openProject() {
+    	JnaFileChooser fc = new JnaFileChooser();
+    	projectPath = Win11FileDialog.openFolder();
+    	if (projectPath != null) {
+    	    File root = projectPath.toFile();
+
+    	    explorerTree.setModel(
+    	        new DefaultTreeModel(createNode(root))
+    	    );
+    	}
+    }
+    
+    private void openFile(File f) {
+    	currentFile = f;
+    	textArea.setText("");
+    	try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(currentFile))) {
+	          String line;
+	          boolean firstLine = true;
+	          while ((line = br.readLine()) != null) {
+	              if (!firstLine) {
+	                  textArea.append("\n");
+	              }
+	              textArea.append(line);
+	              firstLine = false;
+	          }
+	      	} catch (java.io.IOException e) {
+	      			javax.swing.JOptionPane.showMessageDialog(frame, "Error opening file: " + e.getMessage());
+      		}
+    }
+    private void openFile() {
+    	JnaFileChooser fc = new JnaFileChooser();
+    	Path filePath = Win11FileDialog.openFile();
+//    		currentFile = fc.getSelectedFile();
+//        
+//        if (currentFile != null) {
+//            textArea.setText("");
+//            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(currentFile))) {
+//                String line;
+//                boolean firstLine = true;
+//                while ((line = br.readLine()) != null) {
+//                    if (!firstLine) {
+//                        textArea.append("\n");
+//                    }
+//                    textArea.append(line);
+//                    firstLine = false;
+//                }
+//            } catch (java.io.IOException e) {
+//                javax.swing.JOptionPane.showMessageDialog(frame, "Error opening file: " + e.getMessage());
+//            }
+//        }
+//        }
     }
     /**
      * Initialize the contents of the frame.
@@ -163,7 +223,7 @@ public class GUI {
         fileMenu.add(mntmNewMenuItem);
         mntmNewMenuItem.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                openFile();
+                openProject();
             }});
         
         JMenuItem mntmNewMenuItem_1 = new JMenuItem("Save");
@@ -184,7 +244,6 @@ public class GUI {
                 saveFile(false);
             }});
 
-        // Options Menu
         optionsMenu = new JMenu("Options");
         menuBar.add(optionsMenu);
 
@@ -203,26 +262,70 @@ public class GUI {
         JMenuItem toggleLineNumbersItem = new JMenuItem("Toggle Line Numbers");
         optionsMenu.add(toggleLineNumbersItem);
 
-        // Text Area setup
         textArea = new JTextArea();
         textArea.setFont(new Font("Monospaced", Font.PLAIN, currentFontSize));
         textArea.setMargin(new Insets(5, 5, 5, 5));
 
-        // Line Number Gutter setup
         lineNumberGutter = new LineNumberGutter(textArea);
         
         // Wrap everything in a JScrollPane
         scrollPane = new JScrollPane(textArea);
         scrollPane.setRowHeaderView(lineNumberGutter);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        frame.getContentPane().add(scrollPane, BorderLayout.CENTER);
+        explorerTree = new JTree();
+        explorerTree.setRootVisible(true);
+        
+        explorerTree.setCellRenderer(new DefaultTreeCellRenderer() {
 
+            FileSystemView fsv = FileSystemView.getFileSystemView();
+
+            @Override
+            public Component getTreeCellRendererComponent(
+                    JTree tree,
+                    Object value,
+                    boolean sel,
+                    boolean expanded,
+                    boolean leaf,
+                    int row,
+                    boolean hasFocus) {
+
+                super.getTreeCellRendererComponent(
+                        tree, value, sel, expanded, leaf, row, hasFocus);
+
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+                Object obj = node.getUserObject();
+
+                if (obj instanceof File file) {
+                    setText(file.getName().isEmpty()
+                            ? file.getAbsolutePath()
+                            : file.getName());
+
+                    setIcon(fsv.getSystemIcon(file));
+                }
+
+                return this;
+            }
+        });
+
+
+        explorerScroll = new JScrollPane(explorerTree);
+        explorerScroll.setPreferredSize(new Dimension(250, 0));
+        explorerScroll.setBorder(BorderFactory.createEmptyBorder());
+
+        // Split Pane
+        splitPane = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                explorerScroll,
+                scrollPane);
+
+        splitPane.setDividerLocation(250);
+        splitPane.setDividerSize(4);
+        splitPane.setBorder(null);
+
+        frame.getContentPane().add(splitPane, BorderLayout.CENTER);
         // Apply baseline layout colors
         applyTheme();
 
-        // --- Action Listeners ---
-
-        // File -> New Project
         mntmNewProject.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 openCreateProjectDialog();
@@ -269,6 +372,21 @@ public class GUI {
                 scrollPane.repaint();
             }
         });
+    explorerTree.addTreeSelectionListener(e -> {
+
+        DefaultMutableTreeNode node =
+            (DefaultMutableTreeNode) explorerTree.getLastSelectedPathComponent();
+
+        if (node == null)
+            return;
+
+        File file = (File) node.getUserObject();
+
+        if (!file.isFile())
+            return;
+
+        openFile(file);
+    });
     }
 
     /**
@@ -366,7 +484,7 @@ public class GUI {
                 
                 // Right-align numbers inside the gutter with 8px buffer space
                 g.drawString(label, gutterWidth - labelWidth - 8, yOffset);
-            }
-        }
-    }
+            	}
+        	}
+	}
 }
