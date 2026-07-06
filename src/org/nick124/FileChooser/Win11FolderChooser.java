@@ -1,12 +1,13 @@
 package org.nick124.FileChooser;
 
+import java.io.File;
+
 import com.sun.jna.Pointer;
-import com.sun.jna.platform.win32.COM.COMUtils;
-import com.sun.jna.platform.win32.COM.Unknown;
 import com.sun.jna.platform.win32.Guid.GUID;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
+import com.sun.jna.platform.win32.COM.COMUtils;
+import com.sun.jna.platform.win32.COM.Unknown;
 import com.sun.jna.ptr.PointerByReference;
-import java.io.File;
 
 public class Win11FolderChooser {
 
@@ -18,20 +19,20 @@ public class Win11FolderChooser {
         public FileOpenDialogInstance(Pointer p) {
             super(p);
         }
-        
+
         public HRESULT getOptions(PointerByReference pOptions) {
             // MUST pass 'this.getPointer()' as the first array element
             return (HRESULT) this._invokeNativeObject(5, new Object[]{this.getPointer(), pOptions}, HRESULT.class);
         }
-        
+
         public HRESULT setOptions(int options) {
             return (HRESULT) this._invokeNativeObject(4, new Object[]{this.getPointer(), options}, HRESULT.class);
         }
-        
+
         public HRESULT show(Pointer parentHwnd) {
             return (HRESULT) this._invokeNativeObject(3, new Object[]{this.getPointer(), parentHwnd}, HRESULT.class);
         }
-        
+
         public HRESULT getResult(PointerByReference pShellItem) {
             return (HRESULT) this._invokeNativeObject(27, new Object[]{this.getPointer(), pShellItem}, HRESULT.class);
         }
@@ -41,7 +42,7 @@ public class Win11FolderChooser {
         public ShellItemInstance(Pointer p) {
             super(p);
         }
-        
+
         public HRESULT getDisplayName(int sigdnName, PointerByReference pPath) {
             return (HRESULT) this._invokeNativeObject(5, new Object[]{this.getPointer(), sigdnName, pPath}, HRESULT.class);
         }
@@ -49,7 +50,7 @@ public class Win11FolderChooser {
 
     public static File show() {
         HRESULT hr = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
-        if (!COMUtils.SUCCEEDED(hr) && hr.intValue() != 0x80010106) { 
+        if (!COMUtils.SUCCEEDED(hr) && hr.intValue() != 0x80010106) {
             return null;
         }
 
@@ -57,7 +58,7 @@ public class Win11FolderChooser {
         hr = com.sun.jna.platform.win32.Ole32.INSTANCE.CoCreateInstance(
             CLSID_FileOpenDialog, null, Ole32.CLSCTX_INPROC_SERVER, IID_IFileOpenDialog, ppv
         );
-        
+
         if (!COMUtils.SUCCEEDED(hr)) {
             Ole32.INSTANCE.CoUninitialize();
             return null;
@@ -89,7 +90,7 @@ public class Win11FolderChooser {
                     Pointer pathPtr = pPath.getValue();
                     String fullPath = pathPtr.getWideString(0);
                     selectedFolder = new File(fullPath);
-                    
+
                     Ole32.INSTANCE.CoTaskMemFree(pathPtr);
                 } finally {
                     shellItem.Release();

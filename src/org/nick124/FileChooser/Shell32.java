@@ -9,11 +9,12 @@
  */
 package org.nick124.FileChooser;
 
+import java.util.Arrays;
+import java.util.List;
+
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
-import java.util.Arrays;
-import java.util.List;
 
 
 public class Shell32
@@ -36,6 +37,7 @@ public class Shell32
 		public Pointer lParam;
 		public int iImage;
 
+		@Override
 		protected List<String> getFieldOrder() {
 		return Arrays.asList(new String[] { "hwndOwner","pidlRoot","pszDisplayName","lpszTitle"
 				,"ulFlags","lpfn","lParam","iImage"});

@@ -5,24 +5,21 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
-import java.awt.FileDialog;
-import java.awt.Frame;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedReader;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 
 import javax.swing.BorderFactory;
 import javax.swing.JDialog;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -32,7 +29,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
-import javax.swing.UIManager;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileSystemView;
@@ -41,36 +39,26 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 
+import org.nick124.FileChooser.CreateFileTree;
 import org.nick124.FileChooser.Win11FileDialog;
+import org.nick124.Settings.ConfigureSettings;
 
-import com.sun.jna.Platform;
-
-import jnafilechooser.api.JnaFileChooser;
-import jnafilechooser.api.JnaFileChooser.Mode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class GUI {
-    private JFrame frame;
-    private JTextArea textArea;
-    private JScrollPane scrollPane;
-    private LineNumberGutter lineNumberGutter;
-    private JMenu optionsMenu;
-    private JSplitPane splitPane;
-    private JTree explorerTree;
-    private JScrollPane explorerScroll;
-    
-    // Theme Colors
-    private final Color LIGHT_BG = Color.WHITE;
-    private final Color LIGHT_FG = Color.BLACK;
-    private final Color LIGHT_GUTTER_BG = new Color(240, 240, 240);
-    private final Color LIGHT_GUTTER_FG = Color.GRAY;
+    public static JFrame frame;
+    public static JTextArea textArea;
+    public static JScrollPane scrollPane;
+    public static LineNumberGutter lineNumberGutter;
+    public static JMenu optionsMenu;
+    public static JSplitPane splitPane;
+    public static JTree explorerTree;
+    public static JScrollPane explorerScroll;
+    public static DefaultTreeCellRenderer treeCellRenderer;
 
-    private final Color DARK_BG = new Color(43, 43, 43);
-    private final Color DARK_FG = new Color(169, 183, 198);
-    private final Color DARK_GUTTER_BG = new Color(49, 51, 53);
-    private final Color DARK_GUTTER_FG = new Color(92, 96, 100);
-
-    private boolean isDarkTheme = false;
-    private int currentFontSize = 14;
+    public static boolean isDarkTheme = false;
+    public static int currentFontSize = 14;
 
     /**
      * Create the application.
@@ -89,7 +77,8 @@ public class GUI {
      */
     public static void main(String[] args) {
         EventQueue.invokeLater(new Runnable() {
-            public void run() {
+            @Override
+			public void run() {
                 try {
                     GUI window = new GUI();
                     window.frame.setVisible(true);
@@ -99,66 +88,109 @@ public class GUI {
             }
         });
     }
-    
+
     private java.io.File currentFile = null;
     private Path projectPath = null;
-    
+
     public void setFile(java.io.File f) {currentFile = f;}
-    
+
     private void saveFile(boolean isSaveAs) {
         if (isSaveAs || currentFile == null) {
-        		JnaFileChooser fc = new JnaFileChooser();
-        		currentFile = fc.getSelectedFile();
+//        		JnaFileChooser fc = new JnaFileChooser();
+//        		currentFile = fc.getSelectedFile();
         }
         try (java.io.FileWriter writer = new java.io.FileWriter(currentFile)) {
             textArea.write(writer);
         } catch (java.io.IOException ex) {
-            javax.swing.JOptionPane.showMessageDialog(frame, 
-                "Error saving file: " + ex.getMessage(), 
-                "Error", 
+            javax.swing.JOptionPane.showMessageDialog(frame,
+                "Error saving file: " + ex.getMessage(),
+                "Error",
                 javax.swing.JOptionPane.ERROR_MESSAGE);
         }
     }
-    private DefaultMutableTreeNode createNode(File file) {
 
-        DefaultMutableTreeNode node =
-                new DefaultMutableTreeNode(file);
-
-        File[] files = file.listFiles();
-
-        if (files != null) {
-
-            Arrays.sort(files, (a, b) -> {
-
-                if (a.isDirectory() && !b.isDirectory())
-                    return -1;
-
-                if (!a.isDirectory() && b.isDirectory())
-                    return 1;
-
-                return a.getName().compareToIgnoreCase(b.getName());
-            });
-
-            for (File child : files) {
-                node.add(createNode(child));
-            }
+    private void loadSettings() {
+        if (projectPath != null) {
+            File root = projectPath.toFile();
+            File metadata = new File(root, ".pulse");
+            if (metadata.exists()) {
+                File settingsFile = new File(metadata, ".settings");
+                if (settingsFile.exists()) {
+                    ObjectMapper mapper = new ObjectMapper();
+                    try {
+                        if (!settingsFile.exists()) {
+                            ObjectNode json = mapper.createObjectNode();
+                            json.put("Theme", "DARK");
+                            json.put("Font Size", "14");
+                            json.put("Line Numbering", "true");
+                            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(settingsFile))) {
+                                writer.write(json.toPrettyString());
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        } else {
+                            ObjectNode json = (ObjectNode) mapper.readTree(settingsFile);
+                            ConfigureSettings.applySettings(json);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }        
         }
-
-        return node;
     }
-    
+
+
     private void openProject() {
-    	JnaFileChooser fc = new JnaFileChooser();
+//    	JnaFileChooser fc = new JnaFileChooser();
     	projectPath = Win11FileDialog.openFolder();
     	if (projectPath != null) {
     	    File root = projectPath.toFile();
 
     	    explorerTree.setModel(
-    	        new DefaultTreeModel(createNode(root))
+    	        new DefaultTreeModel(CreateFileTree.createNode(root))
     	    );
+            explorerTree.expandRow(0);
+    	    File metadata = new File(root, ".pulse");
+
+    	    if (!metadata.exists()) {
+    	        if (metadata.mkdir()) {
+    	        	File data = new File(metadata, ".settings");
+    	        	try {data.createNewFile();} catch (IOException e) {e.printStackTrace();}
+    	        		ObjectMapper mapper = new ObjectMapper();
+    	        		ObjectNode json = mapper.createObjectNode();
+    	        		json.put("Theme", "DARK");
+    	        		json.put("Font Size", "14");
+    	        		json.put("Line Numbering", "true");
+    	        		try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(data))) {
+	    	        		writer.write(json.toPrettyString());
+    	        		} catch (IOException e) {e.printStackTrace();}
+    	        } else {
+                    File data = new File(metadata, ".settings");
+                    ObjectMapper mapper = new ObjectMapper();
+                    ObjectNode json = mapper.createObjectNode();
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(data))) {
+                        json = (ObjectNode) mapper.readTree(reader);
+                        ConfigureSettings.applySettings(json);                      
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    ConfigureSettings.applySettings(json);
+    	        }
+    	    } else {
+    	        File data = new File(metadata, ".settings");
+    	        ObjectMapper mapper = new ObjectMapper();
+    	        ObjectNode json = mapper.createObjectNode();
+    	        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(data))) {
+    	            json = (ObjectNode) mapper.readTree(reader);
+    	        } catch (IOException e) {
+    	            e.printStackTrace();
+    	        }
+    	        ConfigureSettings.applySettings(json);
+            }
     	}
     }
-    
+
     private void openFile(File f) {
     	currentFile = f;
     	textArea.setText("");
@@ -177,10 +209,10 @@ public class GUI {
       		}
     }
     private void openFile() {
-    	JnaFileChooser fc = new JnaFileChooser();
+//    	JnaFileChooser fc = new JnaFileChooser();
     	Path filePath = Win11FileDialog.openFile();
 //    		currentFile = fc.getSelectedFile();
-//        
+//
 //        if (currentFile != null) {
 //            textArea.setText("");
 //            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(currentFile))) {
@@ -205,7 +237,7 @@ public class GUI {
     private void initialize() {
         frame = new JFrame("Pulse IDE");
         frame.setBounds(100, 100, 800, 600);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new BorderLayout());
 
         // Create Menu Bar
@@ -218,29 +250,32 @@ public class GUI {
 
         JMenuItem mntmNewProject = new JMenuItem("New Project...");
         fileMenu.add(mntmNewProject);
-        
+
         JMenuItem mntmNewMenuItem = new JMenuItem("Open Project");
         fileMenu.add(mntmNewMenuItem);
         mntmNewMenuItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 openProject();
             }});
-        
+
         JMenuItem mntmNewMenuItem_1 = new JMenuItem("Save");
         mntmNewMenuItem_1.setAccelerator(javax.swing.KeyStroke.getKeyStroke(
-        	    java.awt.event.KeyEvent.VK_S, 
+        	    java.awt.event.KeyEvent.VK_S,
         	    java.awt.Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
         fileMenu.add(mntmNewMenuItem_1);
-        
+
         JMenuItem mntmNewMenuItem_2 = new JMenuItem("Save as...");
         fileMenu.add(mntmNewMenuItem_2);
         mntmNewMenuItem_2.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 saveFile(true);
             }});
-        
+
         mntmNewMenuItem_1.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 saveFile(false);
             }});
 
@@ -267,15 +302,39 @@ public class GUI {
         textArea.setMargin(new Insets(5, 5, 5, 5));
 
         lineNumberGutter = new LineNumberGutter(textArea);
-        
+
         // Wrap everything in a JScrollPane
         scrollPane = new JScrollPane(textArea);
         scrollPane.setRowHeaderView(lineNumberGutter);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         explorerTree = new JTree();
+        explorerTree.addMouseListener(new MouseAdapter() {
+        	@Override
+        	public void mouseClicked(MouseEvent e) {
+                if (!SwingUtilities.isLeftMouseButton(e)) {
+            		return;
+            	}
+
+            	javax.swing.tree.TreePath path = explorerTree.getPathForLocation(e.getX(), e.getY());
+            	if (path == null) {
+            		return;
+            	}
+
+            	Object value = ((DefaultMutableTreeNode) path.getLastPathComponent()).getUserObject();
+            	if (value instanceof File file && file.isFile()) {
+            		openFile(file);
+            	}
+        	}
+        });
+        explorerTree.setModel(new DefaultTreeModel(
+        	new DefaultMutableTreeNode("JTree") {
+        		{
+        		}
+        	}
+        ));
         explorerTree.setRootVisible(true);
-        
-        explorerTree.setCellRenderer(new DefaultTreeCellRenderer() {
+
+        treeCellRenderer = new DefaultTreeCellRenderer() {
 
             FileSystemView fsv = FileSystemView.getFileSystemView();
 
@@ -305,7 +364,8 @@ public class GUI {
 
                 return this;
             }
-        });
+        };
+        explorerTree.setCellRenderer(treeCellRenderer);
 
 
         explorerScroll = new JScrollPane(explorerTree);
@@ -324,25 +384,28 @@ public class GUI {
 
         frame.getContentPane().add(splitPane, BorderLayout.CENTER);
         // Apply baseline layout colors
-        applyTheme();
+        ConfigureSettings.applyTheme();
 
         mntmNewProject.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 openCreateProjectDialog();
             }
         });
 
         // Options -> Toggle Dark Theme
         toggleThemeItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 isDarkTheme = !isDarkTheme;
-                applyTheme();
+                ConfigureSettings.applyTheme();
             }
         });
 
         // Options -> Increase Font Size
         increaseFontItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 if (currentFontSize < 40) {
                     currentFontSize += 2;
                     updateFont();
@@ -352,7 +415,8 @@ public class GUI {
 
         // Options -> Decrease Font Size
         decreaseFontItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 if (currentFontSize > 10) {
                     currentFontSize -= 2;
                     updateFont();
@@ -362,7 +426,8 @@ public class GUI {
 
         // Options -> Toggle Line Numbers
         toggleLineNumbersItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+            @Override
+			public void actionPerformed(ActionEvent e) {
                 if (scrollPane.getRowHeader() != null && scrollPane.getRowHeader().getView() != null) {
                     scrollPane.setRowHeaderView(null);
                 } else {
@@ -377,42 +442,21 @@ public class GUI {
         DefaultMutableTreeNode node =
             (DefaultMutableTreeNode) explorerTree.getLastSelectedPathComponent();
 
-        if (node == null)
-            return;
+        if (node == null) {
+			return;
+		}
 
         File file = (File) node.getUserObject();
 
-        if (!file.isFile())
-            return;
+        if (!file.isFile()) {
+			return;
+		}
 
         openFile(file);
     });
     }
 
-    /**
-     * Applies colors based on light or dark selection
-     */
-    private void applyTheme() {
-        if (isDarkTheme) {
-            textArea.setBackground(DARK_BG);
-            textArea.setForeground(DARK_FG);
-            textArea.setCaretColor(DARK_FG);
-            lineNumberGutter.setBackground(DARK_GUTTER_BG);
-            lineNumberGutter.setForeground(DARK_GUTTER_FG);
-        } else {
-            textArea.setBackground(LIGHT_BG);
-            textArea.setForeground(LIGHT_FG);
-            textArea.setCaretColor(LIGHT_FG);
-            lineNumberGutter.setBackground(LIGHT_GUTTER_BG);
-            lineNumberGutter.setForeground(LIGHT_GUTTER_FG);
-        }
-        frame.repaint();
-    }
-
-    /**
-     * Updates font sizes across components synchronously
-     */
-    private void updateFont() {
+    public static void updateFont() {
         Font newFont = new Font("Monospaced", Font.PLAIN, currentFontSize);
         textArea.setFont(newFont);
         lineNumberGutter.setFont(newFont);
@@ -428,14 +472,14 @@ public class GUI {
         dialog.setContentPane(createProjectUI.getRootComponent());
         dialog.setSize(500, 260);
         dialog.setLocationRelativeTo(frame);
-        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         dialog.setVisible(true);
     }
-    
+
     /**
      * Component that renders line numbers for a target JTextArea.
      */
-    private static class LineNumberGutter extends JPanel {
+    public static class LineNumberGutter extends JPanel {
         private final JTextArea textArea;
 
         public LineNumberGutter(JTextArea textArea) {
@@ -444,9 +488,12 @@ public class GUI {
 
             // Listen for document structural changes to trigger dynamic line counts
             textArea.getDocument().addDocumentListener(new DocumentListener() {
-                public void changedUpdate(DocumentEvent e) { repaint(); }
-                public void insertUpdate(DocumentEvent e) { repaint(); }
-                public void removeUpdate(DocumentEvent e) { repaint(); }
+                @Override
+				public void changedUpdate(DocumentEvent e) { repaint(); }
+                @Override
+				public void insertUpdate(DocumentEvent e) { repaint(); }
+                @Override
+				public void removeUpdate(DocumentEvent e) { repaint(); }
             });
         }
 
@@ -478,10 +525,10 @@ public class GUI {
             for (int i = 0; i < lineCount; i++) {
                 String label = String.valueOf(i + 1);
                 int labelWidth = metrics.stringWidth(label);
-                
+
                 // Calculate position matching JTextArea line coordinates
                 int yOffset = (i * fontHeight) + fontAscent + textArea.getInsets().top;
-                
+
                 // Right-align numbers inside the gutter with 8px buffer space
                 g.drawString(label, gutterWidth - labelWidth - 8, yOffset);
             	}

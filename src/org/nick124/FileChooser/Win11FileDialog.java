@@ -1,14 +1,17 @@
 package org.nick124.FileChooser;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import com.sun.jna.Pointer;
-import com.sun.jna.platform.win32.*;
+import com.sun.jna.platform.win32.Guid;
+import com.sun.jna.platform.win32.WTypes;
+import com.sun.jna.platform.win32.WinDef;
+import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
 import com.sun.jna.platform.win32.COM.COMUtils;
 import com.sun.jna.platform.win32.COM.Unknown;
 import com.sun.jna.ptr.PointerByReference;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 public class Win11FileDialog {
 
@@ -23,7 +26,7 @@ public class Win11FileDialog {
     // FOS flags
     private static final int FOS_PICKFOLDERS = 0x00000020;
     private static final int FOS_FORCEFILESYSTEM = 0x00000040;
-    
+
     public static Path openFile() {
         HRESULT hr = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
         // 0x80010106 = RPC_E_CHANGED_MODE -> COM already initialized on this thread
@@ -92,7 +95,7 @@ public class Win11FileDialog {
             }
         }
     }
-    
+
     public static Path openFolder() {
         HRESULT hr = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
         // 0x80010106 = RPC_E_CHANGED_MODE -> COM already initialized on this thread

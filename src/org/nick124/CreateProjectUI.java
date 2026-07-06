@@ -1,10 +1,21 @@
 package org.nick124;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.Window;
 import java.io.File;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 /**
  * Backing class for CreateProjectUI.form (IntelliJ GUI Designer).
@@ -78,9 +89,9 @@ public class CreateProjectUI {
                 "Created " + type + " project \"" + name + "\" at:\n" + projectDir.getAbsolutePath(),
                 "Project Created",
                 JOptionPane.INFORMATION_MESSAGE);
-        
+
         GUI.getInstance().setFile(projectDir);
-        
+
         Window window = SwingUtilities.getWindowAncestor(rootPanel);
         if (window != null) {
         	window.dispose();
@@ -187,6 +198,7 @@ public class CreateProjectUI {
      * Entry point for standalone testing of the dialog.
      */
     public static void main(String[] args) {
-        GUI.getInstance().main(args);
+        GUI.getInstance();
+		GUI.main(args);
     }
 }
